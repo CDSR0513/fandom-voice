@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mic2, Building2 } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mic2, Building2, Users } from 'lucide-react';
 
 const Layout = ({ children }) => {
   const [themeMode, setThemeMode] = useState(localStorage.getItem('themeMode') || 'auto');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation(); // 현재 페이지 위치 추적
 
   useEffect(() => {
     const applyTheme = () => {
@@ -19,7 +20,6 @@ const Layout = ({ children }) => {
     };
     
     applyTheme();
-    // 다른 페이지에서 테마를 바꾸면 상단바도 즉시 바뀌도록 감지
     const interval = setInterval(applyTheme, 500);
     return () => clearInterval(interval);
   }, []);
@@ -30,7 +30,6 @@ const Layout = ({ children }) => {
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ${isDarkMode ? "bg-[#0f0f10]" : "bg-[#f8f9fa]"}`}>
-      {/* 🚀 상단 네비게이션 바 (이제 테마에 맞춰 변합니다!) */}
       <header className={`sticky top-0 z-40 ${theme.headerBg} border-b ${theme.border} transition-colors duration-500`}>
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center text-left">
           <Link to="/" className="flex items-center gap-3 group">
@@ -42,9 +41,18 @@ const Layout = ({ children }) => {
               <p className={`text-[10px] ${theme.subText} font-bold transition-colors`}>아이유 전용 여론 수집 플랫폼</p>
             </div>
           </Link>
-          <button onClick={() => navigate('/agency')} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold ${theme.btnBg} ${theme.text} border ${theme.border} ${theme.btnHover} transition`}>
-            <Building2 size={16} className="text-purple-500" /> 소속사 대시보드
-          </button>
+
+          {/* 🔥 현재 위치에 따라 버튼이 똑똑하게 바뀝니다 */}
+          {location.pathname === '/agency' ? (
+            <button onClick={() => navigate('/')} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold ${theme.btnBg} ${theme.text} border ${theme.border} ${theme.btnHover} transition shadow-sm`}>
+              <Users size={16} className="text-purple-500" /> 팬 커뮤니티
+            </button>
+          ) : (
+            <button onClick={() => navigate('/agency')} className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold ${theme.btnBg} ${theme.text} border ${theme.border} ${theme.btnHover} transition shadow-sm`}>
+              <Building2 size={16} className="text-purple-500" /> 소속사 대시보드
+            </button>
+          )}
+
         </div>
       </header>
       
