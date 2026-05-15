@@ -108,7 +108,7 @@ const PostDetailPage = () => {
         {/* 달글(댓글) 영역 */}
         <div className="mb-6 flex items-center gap-2 px-2">
           <MessageSquare size={18} className="text-purple-500" />
-          <h3 className="font-bold text-lg">달글 {post.comment_count || 0}개</h3>
+          <h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3>
         </div>
 
         <div className="space-y-4 mb-10">
@@ -120,10 +120,10 @@ const PostDetailPage = () => {
               <p className={`${theme.text} text-sm font-medium`}>{comment.content}</p>
             </div>
           ))}
-          {comments.length === 0 && <div className={`text-center py-10 ${theme.sub} text-sm`}>아직 작성된 달글이 없습니다. 첫 의견을 남겨주세요!</div>}
+          {comments.length === 0 && <div className={`text-center py-10 ${theme.sub} text-sm`}>아직 작성된 댓글이 없습니다. 첫 의견을 남겨주세요!</div>}
         </div>
 
-        {/* 달글 작성 폼 (하단 고정 느낌) */}
+        {/* 댓글 작성 폼 (하단 고정 느낌) */}
         <form onSubmit={handleAddComment} className="flex gap-3">
           <input 
             className={`flex-1 ${theme.input} border ${theme.border} rounded-full px-6 py-4 outline-none focus:border-purple-600 transition text-sm font-medium`}
