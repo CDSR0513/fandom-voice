@@ -136,7 +136,7 @@ const HomePage = () => {
                   <Heart size={16} fill={likedPosts.includes(post.id) ? "currentColor" : "none"} />
                   <span className="text-sm font-bold">{post.empathy_count || 0}</span>
                 </button>
-                <span className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase tracking-widest"><MessageSquare size={14} /> {post.comment_count || 0} 달글</span>
+                <span className="flex items-center gap-1.5 text-gray-400 text-xs font-bold uppercase tracking-widest"><MessageSquare size={14} /> {post.comment_count || 0} 댓글</span>
               </div>
             </Link>
           ))}
