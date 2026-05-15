@@ -61,6 +61,7 @@ const WritePage = () => {
           content: content.trim(),
           category: selectedCategories.join(', '),
           author_name: '아이유팬',
+          artist_name: '아이유',
         },
       ]);
 
