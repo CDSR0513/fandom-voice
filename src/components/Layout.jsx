@@ -7,7 +7,7 @@ const Layout = ({ children }) => {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] transition-colors duration-500">
+    <div className="min-h-screen bg-[#f8f9fa]">
       <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center text-left">
           <Link to="/" className="flex items-center gap-3 group">
@@ -15,7 +15,7 @@ const Layout = ({ children }) => {
               <Mic2 size={18} className="text-white" />
             </div>
             <div>
-              {/* 폰트 크기 text-lg -> text-base로 축소 */}
+              {/* 제목 폰트 크기 축소 및 검은색 text-[#1a1a1c] 고정 */}
               <h1 className="text-base font-black text-[#1a1a1c]">아이유 팬덤 보이스</h1>
               <p className="text-[10px] text-gray-400 font-bold">아이유 전용 여론 수집 플랫폼</p>
             </div>

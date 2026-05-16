@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, Image, Loader2 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -12,6 +12,8 @@ const WritePage = () => {
   const [content, setContent] = useState('');
   const [password, setPassword] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const navigate = useNavigate();
 
   const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
@@ -20,15 +22,50 @@ const WritePage = () => {
     setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   };
 
+  // 🔥 파일 업로드 처리 함수 (사진, 영상, 움짤 공통)
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `posts/${fileName}`;
+
+    const { data, error } = await supabase.storage.from('media').upload(filePath, file);
+
+    if (error) {
+      alert('파일 업로드 실패: ' + error.message);
+      setIsUploading(false);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(filePath);
+    setMediaUrl(publicUrlData.publicUrl);
+    setIsUploading(false);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title || !content || selectedCategories.length === 0 || !password) {
+    if (!title.trim() || !content.trim() || selectedCategories.length === 0 || !password.trim()) {
       return alert("카테고리, 제목, 내용, 비밀번호를 모두 입력해주세요!");
     }
+
+    // 스마트폰 먹통 버그 해결을 위해 에러 트래킹 추가
     const { error } = await supabase.from('posts').insert([{ 
-      title, content, password, category: selectedCategories, author_name: '아이유팬' 
+      title, 
+      content, 
+      password, 
+      category: selectedCategories, 
+      author_name: '아이유팬',
+      media_url: mediaUrl // 사진/영상 주소 저장
     }]);
-    if (!error) navigate('/');
+
+    if (error) {
+      alert("서버 전송 실패! 사유: " + error.message);
+    } else {
+      navigate('/');
+    }
   };
 
   return (
@@ -55,12 +92,30 @@ const WritePage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <input className="w-full bg-transparent text-xl font-bold border-b border-gray-200 p-4 outline-none focus:border-purple-600 transition text-[#1a1a1c]" placeholder="안건 제목을 입력하세요" value={title} onChange={e => setTitle(e.target.value)} />
-          <textarea className="w-full bg-white border border-gray-200 rounded-[2.5rem] p-8 h-80 text-[#1a1a1c] outline-none focus:ring-2 focus:ring-purple-500 transition resize-none text-sm font-medium shadow-sm" placeholder="상세 내용을 입력하세요." value={content} onChange={e => setContent(e.target.value)} />
+          <textarea className="w-full bg-white border border-gray-200 rounded-[2.5rem] p-8 h-60 text-[#1a1a1c] outline-none focus:ring-2 focus:ring-purple-500 transition resize-none text-sm font-medium shadow-sm" placeholder="상세 내용을 입력하세요." value={content} onChange={e => setContent(e.target.value)} />
           
-          {/* 비밀번호 입력칸 */}
+          {/* 🔥 사진/영상/움짤 첨부 UI */}
+          <div className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm">
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 cursor-pointer hover:text-purple-600 transition">
+              <Image size={18} />
+              <span>사진 / 동영상 / 움짤(GIF) 첨부하기</span>
+              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+            </label>
+            {isUploading && <div className="flex items-center gap-2 text-xs text-purple-600 mt-3"><Loader2 size={14} className="animate-spin" /> 업로드 중...</div>}
+            {mediaUrl && (
+              <div className="mt-4 rounded-xl overflow-hidden border border-gray-100 max-h-48 bg-gray-50 flex items-center justify-center">
+                {mediaUrl.match(/\.(mp4|webm,ogg)$/i) ? (
+                  <video src={mediaUrl} controls className="max-h-48 object-contain" />
+                ) : (
+                  <img src={mediaUrl} alt="첨부 이미지" className="max-h-48 object-contain" />
+                )}
+              </div>
+            )}
+          </div>
+
           <input type="password" maxLength={20} className="w-full bg-white border border-gray-200 p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold shadow-sm" placeholder="수정/삭제용 비밀번호를 설정하세요" value={password} onChange={e => setPassword(e.target.value)} />
 
-          <button className="w-full bg-purple-600 py-6 rounded-[2rem] font-black text-lg hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/40 text-white mt-4">안건 제출하기</button>
+          <button type="submit" className="w-full bg-purple-600 py-6 rounded-[2rem] font-black text-lg hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/40 text-white mt-4">안건 제출하기</button>
         </form>
       </div>
     </div>

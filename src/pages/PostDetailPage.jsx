@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { ChevronLeft, MessageSquare, Send, Heart, Edit3, Trash2, Save, X } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Send, Heart, Edit3, Trash2, Save, X, Image, Loader2 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -13,9 +13,10 @@ const PostDetailPage = () => {
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
+  const [commentMedia, setCommentMedia] = useState('');
+  const [isCommentUploading, setIsCommentUploading] = useState(false);
   const [likedPosts, setLikedPosts] = useState(JSON.parse(localStorage.getItem('likedPosts') || '[]'));
   
-  // 수정 모드 관련 상태
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -25,16 +26,10 @@ const PostDetailPage = () => {
     fetchComments();
   }, [id]);
 
-  useEffect(() => {
-    localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
-  }, [likedPosts]);
-
   const fetchPost = async () => {
     const { data } = await supabase.from('posts').select('*').eq('id', id).single();
     if (data) {
       let cat = data.category;
-      const legacyCats = ['goods', 'agency', '소속사 피드백', '굿즈/공연'];
-      if (!cat || (Array.isArray(cat) ? cat.some(c => legacyCats.includes(c)) : legacyCats.includes(cat))) cat = ['기획 대책 강구'];
       setPost({ ...data, category: Array.isArray(cat) ? cat : [cat] });
     }
   };
@@ -44,58 +39,62 @@ const PostDetailPage = () => {
     if (data) setComments(data);
   };
 
-  const toggleLike = async () => {
-    const isLiked = likedPosts.includes(id);
-    const newCount = isLiked ? Math.max(0, (post.empathy_count || 0) - 1) : (post.empathy_count || 0) + 1;
-    const { error } = await supabase.from('posts').update({ empathy_count: newCount }).eq('id', id);
+  const handleCommentFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsCommentUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const filePath = `comments/${Date.now()}.${fileExt}`;
+    
+    const { error } = await supabase.storage.from('media').upload(filePath, file);
     if (!error) {
-      setLikedPosts(prev => isLiked ? prev.filter(pId => pId !== id) : [...prev, id]);
-      setPost(prev => ({ ...prev, empathy_count: newCount }));
+      const { data } = supabase.storage.from('media').getPublicUrl(filePath);
+      setCommentMedia(data.publicUrl);
     }
-  };
-
-  // 🔥 수정 버튼 클릭 시
-  const handleEditClick = () => {
-    const pwd = window.prompt("글 작성 시 설정한 비밀번호를 입력하세요.");
-    if (pwd === post.password) {
-      setEditTitle(post.title);
-      setEditContent(post.content);
-      setIsEditing(true);
-    } else {
-      alert("비밀번호가 일치하지 않습니다.");
-    }
-  };
-
-  // 🔥 수정 저장
-  const handleSaveEdit = async () => {
-    const { error } = await supabase.from('posts').update({ title: editTitle, content: editContent }).eq('id', id);
-    if (!error) {
-      setPost(prev => ({ ...prev, title: editTitle, content: editContent }));
-      setIsEditing(false);
-    }
-  };
-
-  // 🔥 삭제 버튼 클릭 시
-  const handleDeleteClick = async () => {
-    const pwd = window.prompt("글 작성 시 설정한 비밀번호를 입력하세요.");
-    if (pwd === post.password) {
-      if(window.confirm("이 안건을 정말 삭제하시겠습니까?")) {
-        await supabase.from('posts').delete().eq('id', id);
-        navigate('/');
-      }
-    } else {
-      alert("비밀번호가 일치하지 않습니다.");
-    }
+    setIsCommentUploading(false);
   };
 
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-    await supabase.from('comments').insert([{ post_id: id, content: newComment, author_name: '아이유팬' }]);
-    await supabase.from('posts').update({ comment_count: (post.comment_count || 0) + 1 }).eq('id', id);
-    setNewComment('');
-    fetchComments();
-    fetchPost();
+    const { error } = await supabase.from('comments').insert([{ post_id: id, content: newComment, author_name: '아이유팬', media_url: commentMedia }]);
+    if(!error) {
+      await supabase.from('posts').update({ comment_count: (post.comment_count || 0) + 1 }).eq('id', id);
+      setNewComment('');
+      setCommentMedia('');
+      fetchComments();
+      fetchPost();
+    }
+  };
+
+  const toggleLike = async () => {
+    const isLiked = likedPosts.includes(id);
+    const newCount = isLiked ? Math.max(0, (post.empathy_count || 0) - 1) : (post.empathy_count || 0) + 1;
+    await supabase.from('posts').update({ empathy_count: newCount }).eq('id', id);
+    setLikedPosts(prev => isLiked ? prev.filter(pId => pId !== id) : [...prev, id]);
+    setPost(prev => ({ ...prev, empathy_count: newCount }));
+  };
+
+  const handleEditClick = () => {
+    const pwd = window.prompt("글 설정 비밀번호를 입력하세요.");
+    if (pwd === post.password) { setIsEditing(true); setEditTitle(post.title); setEditContent(post.content); }
+    else { alert("비밀번호가 일치하지 않습니다."); }
+  };
+
+  const handleSaveEdit = async () => {
+    await supabase.from('posts').update({ title: editTitle, content: editContent }).eq('id', id);
+    setPost(prev => ({ ...prev, title: editTitle, content: editContent }));
+    setIsEditing(false);
+  };
+
+  const handleDeleteClick = async () => {
+    const pwd = window.prompt("비밀번호를 입력하세요.");
+    if (pwd === post.password) {
+      if(window.confirm("삭제하시겠습니까?")) {
+        await supabase.from('posts').delete().eq('id', id);
+        navigate('/');
+      }
+    } else { alert("비밀번호 불일치"); }
   };
 
   if (!post) return <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center text-[#1a1a1c]">로딩 중...</div>;
@@ -108,8 +107,6 @@ const PostDetailPage = () => {
         </button>
 
         <div className="bg-white p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border border-gray-200 mb-8 shadow-sm relative">
-          
-          {/* 수정/삭제 메뉴 */}
           {!isEditing && (
             <div className="absolute top-8 right-8 flex gap-3">
               <button onClick={handleEditClick} className="text-gray-400 hover:text-blue-500 transition"><Edit3 size={18} /></button>
@@ -123,60 +120,75 @@ const PostDetailPage = () => {
 
           {isEditing ? (
             <div className="space-y-4 mb-6">
-              <input className="w-full text-2xl font-black bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none focus:border-purple-500" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
-              <textarea className="w-full text-base font-medium bg-gray-50 border border-gray-200 rounded-2xl p-4 h-40 outline-none focus:border-purple-500 resize-none" value={editContent} onChange={e => setEditContent(e.target.value)} />
+              <input className="w-full text-2xl font-black bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+              <textarea className="w-full text-base font-medium bg-gray-50 border border-gray-200 rounded-2xl p-4 h-40 resize-none outline-none" value={editContent} onChange={e => setEditContent(e.target.value)} />
               <div className="flex justify-end gap-2">
-                <button onClick={() => setIsEditing(false)} className="flex items-center gap-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-bold"><X size={16}/> 취소</button>
-                <button onClick={handleSaveEdit} className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white rounded-xl font-bold"><Save size={16}/> 저장</button>
+                <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-bold">취소</button>
+                <button onClick={handleSaveEdit} className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold">저장</button>
               </div>
             </div>
           ) : (
             <>
-              <h1 className="text-2xl md:text-3xl font-black mb-6 leading-tight pr-10">{post.title}</h1>
-              <p className="text-gray-500 text-base leading-relaxed font-medium whitespace-pre-wrap mb-10">{post.content}</p>
+              <h1 className="text-2xl md:text-3xl font-black mb-6 leading-tight pr-10 text-[#1a1a1c]">{post.title}</h1>
+              <p className="text-gray-600 text-base leading-relaxed font-medium whitespace-pre-wrap mb-6">{post.content}</p>
+              
+              {/* 🔥 글에 첨부된 이미지/영상/움짤 출력 */}
+              {post.media_url && (
+                <div className="mb-8 rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 max-h-[400px] flex justify-center items-center">
+                  {post.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
+                    <video src={post.media_url} controls className="max-h-[400px] w-full object-contain" />
+                  ) : (
+                    <img src={post.media_url} alt="본문 미디어" className="max-h-[400px] w-full object-contain" />
+                  )}
+                </div>
+              )}
             </>
           )}
           
-          <div className="flex justify-start">
-            <button onClick={toggleLike}
-              className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all border ${
-                likedPosts.includes(id) 
-                ? 'bg-red-500/10 border-red-500/20 text-red-500 font-bold' 
-                : 'bg-[#f8f9fa] border-gray-200 text-gray-400'
-              }`}>
-              <Heart size={20} fill={likedPosts.includes(id) ? "currentColor" : "none"} />
-              <span className="text-sm font-bold">공감 {post.empathy_count || 0}</span>
-            </button>
-          </div>
+          <button onClick={toggleLike} className={`flex items-center gap-2 px-6 py-3 rounded-full border ${likedPosts.includes(id) ? 'bg-red-500/10 border-red-500/20 text-red-500 font-bold' : 'bg-[#f8f9fa] border-gray-200 text-gray-400'}`}>
+            <Heart size={20} fill={likedPosts.includes(id) ? "currentColor" : "none"} />
+            <span className="text-sm font-bold">공감 {post.empathy_count || 0}</span>
+          </button>
         </div>
 
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <MessageSquare size={18} className="text-purple-500" />
-          <h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3>
-        </div>
-
+        {/* 댓글 목록 */}
+        <div className="mb-6 flex items-center gap-2 px-2"><MessageSquare size={18} className="text-purple-500" /><h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3></div>
         <div className="space-y-4 mb-10">
           {comments.map(comment => (
             <div key={comment.id} className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm">
-              <div className="flex justify-between items-center mb-3">
-                <span className="font-bold text-sm text-purple-600">{comment.author_name}</span>
-              </div>
-              <p className="text-[#1a1a1c] text-sm font-medium">{comment.content}</p>
+              <span className="font-bold text-sm text-purple-600 block mb-2">{comment.author_name}</span>
+              <p className="text-[#1a1a1c] text-sm font-medium mb-3">{comment.content}</p>
+              
+              {/* 🔥 댓글 미디어 출력 */}
+              {comment.media_url && (
+                <div className="rounded-xl overflow-hidden max-h-40 max-w-xs bg-gray-50 border border-gray-100 flex items-center justify-center">
+                  {comment.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
+                    <video src={comment.media_url} controls className="max-h-40 object-contain" />
+                  ) : (
+                    <img src={comment.media_url} alt="댓글 미디어" className="max-h-40 object-contain" />
+                  )}
+                </div>
+              )}
             </div>
           ))}
-          {comments.length === 0 && <div className="text-center py-10 text-gray-500 text-sm">아직 작성된 댓글이 없습니다. 첫 의견을 남겨주세요!</div>}
         </div>
 
-        <form onSubmit={handleAddComment} className="flex gap-3">
-          <input 
-            className="flex-1 bg-gray-50 border border-gray-200 text-[#1a1a1c] rounded-full px-6 py-4 outline-none focus:border-purple-600 transition text-sm font-medium"
-            placeholder="동의하거나 추가할 의견을 댓글로 남겨주세요."
-            value={newComment}
-            onChange={e => setNewComment(e.target.value)}
-          />
-          <button type="submit" className="bg-purple-600 text-white p-4 rounded-full hover:bg-purple-500 transition shadow-lg shadow-purple-900/30">
-            <Send size={20} />
-          </button>
+        {/* 댓글 작성 폼 + 파일첨부 */}
+        <form onSubmit={handleAddComment} className="space-y-3">
+          {commentMedia && (
+            <div className="p-2 bg-white border border-gray-200 rounded-xl inline-block relative">
+              <img src={commentMedia} alt="댓글 첨부 미리보기" className="h-14 w-14 object-cover rounded-lg" />
+              <button type="button" onClick={() => setCommentMedia('')} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><X size={10}/></button>
+            </div>
+          )}
+          <div className="flex gap-3 items-center">
+            <label className="bg-gray-200 p-4 rounded-full text-gray-600 hover:text-purple-600 cursor-pointer transition">
+              <Image size={20} />
+              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleCommentFileUpload} />
+            </label>
+            <input className="flex-1 bg-gray-50 border border-gray-200 text-[#1a1a1c] rounded-full px-6 py-4 outline-none focus:border-purple-600 text-sm font-medium" placeholder="댓글을 남겨주세요." value={newComment} onChange={e => setNewComment(e.target.value)} />
+            <button type="submit" className="bg-purple-600 text-white p-4 rounded-full hover:bg-purple-500 transition"><Send size={20} /></button>
+          </div>
         </form>
       </div>
     </div>
