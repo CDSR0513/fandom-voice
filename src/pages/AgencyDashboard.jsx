@@ -13,6 +13,16 @@ const parseMediaUrls = (urlStr) => {
   catch { return [urlStr]; } 
 };
 
+// 🔥 카테고리 괄호 포장지([" "])를 예쁘게 벗겨주는 해독기
+const parseCategory = (cat) => {
+  if (!cat) return ['기타'];
+  if (Array.isArray(cat)) return cat;
+  try { 
+    const parsed = JSON.parse(cat); 
+    return Array.isArray(parsed) ? parsed : [cat]; 
+  } catch { return [cat]; }
+};
+
 const AgencyDashboard = () => {
   const [posts, setPosts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('전체');
@@ -21,7 +31,6 @@ const AgencyDashboard = () => {
 
   useEffect(() => { 
     fetchPosts(); 
-    
     const syncTheme = () => {
       const mode = localStorage.getItem('themeMode') || 'auto';
       if (mode === 'auto') {
@@ -39,16 +48,9 @@ const AgencyDashboard = () => {
     const { data } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
     if (data) {
       setPosts(data.map(p => {
-        // 🔥 예전 카테고리(agency, goods 등)를 '기획 대책 강구'로 강제 변환하는 로직 복구
-        let catArray = Array.isArray(p.category) ? p.category : [p.category];
-        const isLegacy = catArray.some(c => {
-          const lowerC = String(c).toLowerCase();
-          return ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(lowerC);
-        });
-        
-        if (isLegacy || !catArray.length || !catArray[0]) {
-          catArray = ['기획 대책 강구'];
-        }
+        let catArray = parseCategory(p.category);
+        const isLegacy = catArray.some(c => ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(String(c).toLowerCase()));
+        if (isLegacy) catArray = ['기획 대책 강구'];
 
         return { 
           ...p, 
@@ -94,21 +96,15 @@ const AgencyDashboard = () => {
                 <div className="w-full md:w-1/4 flex flex-wrap gap-1">
                   {post.domains.map(d => <span key={d} className="bg-purple-600/10 text-purple-600 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase">{d}</span>)}
                 </div>
-                
                 <div className="w-full md:flex-1">
                   <Link to={`/post/${post.id}`} className="block">
                     <div className={`font-bold ${theme.text} text-lg group-hover:text-purple-600 transition flex items-center gap-2`}>
                       {post.title} <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition hidden md:block" />
                     </div>
                     <div className={`${theme.sub} text-sm mt-2 whitespace-pre-wrap`}>{post.content}</div>
-                    
                     {post.parsedUrls.length > 0 && (
                       <div className="mt-4 rounded-xl overflow-hidden max-h-40 max-w-sm border border-gray-200/20 bg-black/5">
-                        {post.parsedUrls[0].match(/\.(mp4|webm|ogg)$/i) ? (
-                          <video src={post.parsedUrls[0]} className="max-h-40 w-full object-cover" />
-                        ) : (
-                          <img src={post.parsedUrls[0]} alt="첨부 미리보기" className="max-h-40 w-full object-cover" />
-                        )}
+                        {post.parsedUrls[0].match(/\.(mp4|webm|ogg)$/i) ? <video src={post.parsedUrls[0]} className="max-h-40 w-full object-cover" /> : <img src={post.parsedUrls[0]} alt="첨부 미리보기" className="max-h-40 w-full object-cover" />}
                       </div>
                     )}
                   </Link>

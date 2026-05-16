@@ -35,7 +35,6 @@ const PostDetailPage = () => {
 
   const [likedPosts, setLikedPosts] = useState(JSON.parse(localStorage.getItem('likedPosts') || '[]'));
   
-  // 🔥 댓글 수정 전용 상태
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentContent, setEditCommentContent] = useState('');
   const [editCommentMediaUrls, setEditCommentMediaUrls] = useState([]);
@@ -55,8 +54,14 @@ const PostDetailPage = () => {
   const fetchPost = async () => {
     const { data } = await supabase.from('posts').select('*').eq('id', id).single();
     if (data) {
-      let cat = data.category;
-      setPost({ ...data, category: Array.isArray(cat) ? cat : [cat], parsedUrls: parseMediaUrls(data.media_url) });
+      let catArray = [];
+      try {
+        catArray = Array.isArray(data.category) ? data.category : JSON.parse(data.category);
+        if (!Array.isArray(catArray)) catArray = [data.category];
+      } catch {
+        catArray = [data.category || '기타'];
+      }
+      setPost({ ...data, category: catArray, parsedUrls: parseMediaUrls(data.media_url) });
     }
   };
 
@@ -93,7 +98,6 @@ const PostDetailPage = () => {
     }
   };
 
-  // 🔥 댓글 수정 시작 (파일 배열도 불러오기)
   const startEditComment = (comment) => {
     const pwd = window.prompt("댓글 비밀번호를 입력하세요.");
     if (pwd === comment.password) { 
@@ -101,10 +105,9 @@ const PostDetailPage = () => {
       setEditCommentContent(comment.content); 
       setEditCommentMediaUrls(comment.parsedUrls || []); 
     }
-    else alert("비밀번호 불일치");
+    else alert("비밀번호가 일치하지 않습니다.");
   };
 
-  // 🔥 댓글 수정 저장 (파일 배열도 같이 저장)
   const handleSaveCommentEdit = async (commentId) => {
     await supabase.from('comments').update({ 
       content: editCommentContent, 
@@ -121,7 +124,7 @@ const PostDetailPage = () => {
         await supabase.from('posts').update({ comment_count: Math.max(0, (post.comment_count || 0) - 1) }).eq('id', id);
         fetchComments(); fetchPost();
       }
-    } else alert("비밀번호 불일치");
+    } else alert("비밀번호가 일치하지 않습니다.");
   };
 
   const toggleLike = async () => {
@@ -136,7 +139,7 @@ const PostDetailPage = () => {
     const pwd = window.prompt("글 설정 비밀번호를 입력하세요.");
     if (pwd === post.password) { 
       setIsEditing(true); setEditTitle(post.title); setEditContent(post.content); setEditMediaUrls(post.parsedUrls); 
-    } else alert("비밀번호 불일치");
+    } else alert("비밀번호가 일치하지 않습니다.");
   };
 
   const handleSaveEdit = async () => {
@@ -148,7 +151,7 @@ const PostDetailPage = () => {
     const pwd = window.prompt("비밀번호를 입력하세요.");
     if (pwd === post.password) {
       if(window.confirm("삭제하시겠습니까?")) { await supabase.from('posts').delete().eq('id', id); navigate('/'); }
-    } else alert("비밀번호 불일치");
+    } else alert("비밀번호가 일치하지 않습니다.");
   };
 
   const theme = isDarkMode 
@@ -242,7 +245,6 @@ const PostDetailPage = () => {
                 <div className="mt-2">
                   <textarea className={`w-full p-3 ${theme.input} border ${theme.border} rounded-xl text-sm outline-none resize-none`} value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} />
                   
-                  {/* 🔥 댓글 수정 파일 첨부 영역 */}
                   <div className={`mt-3 border ${theme.border} p-3 rounded-xl`}>
                     <button type="button" onClick={() => document.getElementById(`edit-comment-file-${comment.id}`).click()} className={`text-xs font-bold ${theme.sub} flex gap-2`}>
                       <ImageIcon size={14}/> 사진/영상 추가
