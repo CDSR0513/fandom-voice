@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, Image, Loader2 } from 'lucide-react';
@@ -14,6 +14,7 @@ const WritePage = () => {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [mediaUrl, setMediaUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null); // 모바일 터치 버그 뚫기용 ref
   const navigate = useNavigate();
 
   const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
@@ -22,49 +23,60 @@ const WritePage = () => {
     setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   };
 
-  // 🔥 파일 업로드 처리 함수 (사진, 영상, 움짤 공통)
+  // 🔥 파일 업로드 처리 함수 (강력한 예외 감지 장치 장착)
   const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    try {
+      const file = e.target.files[0];
+      if (!file) return;
 
-    setIsUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `posts/${fileName}`;
+      setIsUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `posts/${fileName}`;
 
-    const { data, error } = await supabase.storage.from('media').upload(filePath, file);
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error("환경 변수가 정상 로드되지 않았습니다. Vercel 환경 변수 세팅을 확인하세요.");
+      }
 
-    if (error) {
-      alert('파일 업로드 실패: ' + error.message);
+      const { data, error } = await supabase.storage.from('media').upload(filePath, file);
+
+      if (error) {
+        throw new Error(`${error.message} (※ Supabase Storage 메뉴에서 media 버킷의 RLS 정책 생성 중 anon 권한에 대한 INSERT가 풀려있는지 반드시 확인하세요!)`);
+      }
+
+      const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(filePath);
+      setMediaUrl(publicUrlData.publicUrl);
+      alert("파일이 성공적으로 첨부되어 업로드되었습니다!");
+    } catch (err) {
+      alert('⚠️ 파일 업로드 실패: ' + err.message);
+    } finally {
       setIsUploading(false);
-      return;
     }
-
-    const { data: publicUrlData } = supabase.storage.from('media').getPublicUrl(filePath);
-    setMediaUrl(publicUrlData.publicUrl);
-    setIsUploading(false);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim() || selectedCategories.length === 0 || !password.trim()) {
-      return alert("카테고리, 제목, 내용, 비밀번호를 모두 입력해주세요!");
-    }
+    try {
+      if (!title.trim() || !content.trim() || selectedCategories.length === 0 || !password.trim()) {
+        return alert("카테고리, 제목, 내용, 비밀번호를 모두 입력해주세요!");
+      }
 
-    // 스마트폰 먹통 버그 해결을 위해 에러 트래킹 추가
-    const { error } = await supabase.from('posts').insert([{ 
-      title, 
-      content, 
-      password, 
-      category: selectedCategories, 
-      author_name: '아이유팬',
-      media_url: mediaUrl // 사진/영상 주소 저장
-    }]);
+      const { error } = await supabase.from('posts').insert([{ 
+        title: title.trim(), 
+        content: content.trim(), 
+        password: password.trim(), 
+        category: selectedCategories, 
+        author_name: '아이유팬',
+        media_url: mediaUrl 
+      }]);
 
-    if (error) {
-      alert("서버 전송 실패! 사유: " + error.message);
-    } else {
+      if (error) {
+        throw new Error(`DB 전송 실패: ${error.message}`);
+      }
+
       navigate('/');
+    } catch (err) {
+      alert("⚠️ 안건 제출 중 에러 발생: " + err.message);
     }
   };
 
@@ -94,17 +106,30 @@ const WritePage = () => {
           <input className="w-full bg-transparent text-xl font-bold border-b border-gray-200 p-4 outline-none focus:border-purple-600 transition text-[#1a1a1c]" placeholder="안건 제목을 입력하세요" value={title} onChange={e => setTitle(e.target.value)} />
           <textarea className="w-full bg-white border border-gray-200 rounded-[2.5rem] p-8 h-60 text-[#1a1a1c] outline-none focus:ring-2 focus:ring-purple-500 transition resize-none text-sm font-medium shadow-sm" placeholder="상세 내용을 입력하세요." value={content} onChange={e => setContent(e.target.value)} />
           
-          {/* 🔥 사진/영상/움짤 첨부 UI */}
+          {/* 🔥 스마트폰에서 안전하게 동작하도록 개조된 미디어 첨부 영역 */}
           <div className="bg-white border border-gray-200 p-6 rounded-2xl shadow-sm">
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-500 cursor-pointer hover:text-purple-600 transition">
+            <button 
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-600 transition"
+            >
               <Image size={18} />
               <span>사진 / 동영상 / 움짤(GIF) 첨부하기</span>
-              <input type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-            </label>
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              accept="image/*,video/*" 
+              className="hidden" 
+              onChange={handleFileUpload} 
+              disabled={isUploading} 
+            />
+
             {isUploading && <div className="flex items-center gap-2 text-xs text-purple-600 mt-3"><Loader2 size={14} className="animate-spin" /> 업로드 중...</div>}
+            
             {mediaUrl && (
               <div className="mt-4 rounded-xl overflow-hidden border border-gray-100 max-h-48 bg-gray-50 flex items-center justify-center">
-                {mediaUrl.match(/\.(mp4|webm,ogg)$/i) ? (
+                {mediaUrl.match(/\.(mp4|webm|ogg)$/i) ? (
                   <video src={mediaUrl} controls className="max-h-48 object-contain" />
                 ) : (
                   <img src={mediaUrl} alt="첨부 이미지" className="max-h-48 object-contain" />
