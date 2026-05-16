@@ -61,6 +61,11 @@ const PostDetailPage = () => {
       } catch {
         catArray = [data.category || '기타'];
       }
+
+      // 🔥 예전 카테고리(AGENCY, GOODS 등)를 강제로 '기획 대책 강구'로 덮어씌우는 로직
+      const isLegacy = catArray.some(c => ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(String(c).toLowerCase()));
+      if (isLegacy) catArray = ['기획 대책 강구'];
+
       setPost({ ...data, category: catArray, parsedUrls: parseMediaUrls(data.media_url) });
     }
   };
@@ -154,6 +159,25 @@ const PostDetailPage = () => {
     } else alert("비밀번호가 일치하지 않습니다.");
   };
 
+  // 🔥 댓글 작성자 분류기 (글쓴팬 vs 아이유팬1, 아이유팬2)
+  const getProcessedComments = () => {
+    if (!post) return [];
+    const pwMap = new Map();
+    let fanCount = 1;
+
+    return comments.map(c => {
+      let dName = '아이유팬';
+      if (c.password && post.password && c.password === post.password) {
+        dName = '글쓴팬 ✍️'; // 글 작성자와 비밀번호가 같으면 글쓴팬으로 표시
+      } else {
+        const key = c.password || `unknown-${c.id}`;
+        if (!pwMap.has(key)) pwMap.set(key, fanCount++);
+        dName = `아이유팬 ${pwMap.get(key)}`; // 고유 비밀번호별로 번호 부여
+      }
+      return { ...c, displayName: dName };
+    });
+  };
+
   const theme = isDarkMode 
     ? { bg: "bg-[#0f0f10]", card: "bg-[#1a1a1c]", text: "text-white", sub: "text-gray-400", border: "border-white/10", input: "bg-black text-white" }
     : { bg: "bg-[#f8f9fa]", card: "bg-white", text: "text-[#1a1a1c]", sub: "text-gray-500", border: "border-gray-200", input: "bg-gray-50 text-[#1a1a1c]" };
@@ -229,10 +253,13 @@ const PostDetailPage = () => {
         <div className="mb-6 flex items-center gap-2 px-2"><MessageSquare size={18} className="text-purple-500" /><h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3></div>
         
         <div className="space-y-4 mb-10">
-          {comments.map(comment => (
+          {/* 🔥 처리된 댓글(넘버링 포함) 목록을 렌더링합니다 */}
+          {getProcessedComments().map(comment => (
             <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm relative`}>
               <div className="flex justify-between items-center mb-3">
-                <span className="font-bold text-sm text-purple-600">{comment.author_name}</span>
+                <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : 'text-purple-600'}`}>
+                  {comment.displayName}
+                </span>
                 {editingCommentId !== comment.id && (
                   <div className="flex gap-3 flex-shrink-0 ml-2">
                     <button onClick={() => startEditComment(comment)} className={`${theme.sub} hover:text-blue-500`}><Edit3 size={16}/></button>
