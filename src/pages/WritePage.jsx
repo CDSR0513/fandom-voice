@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
@@ -10,156 +10,57 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const WritePage = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [password, setPassword] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const navigate = useNavigate();
 
-  const categories = [
-    '소속사 피드백 요청',
-    '연예인 피드백 요청',
-    '악플 대책 강구',
-    '홍보 대책 강구',
-    '기획 대책 강구',
-    '기타',
-  ];
-
-  useEffect(() => {
-    const mode = localStorage.getItem('themeMode') || 'auto';
-
-    if (mode === 'auto') {
-      const hour = new Date().getHours();
-      setIsDarkMode(hour < 6 || hour >= 19);
-    } else {
-      setIsDarkMode(mode === 'dark');
-    }
-  }, []);
+  const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
 
   const toggleCategory = (cat) => {
-    setSelectedCategories((prev) =>
-      prev.includes(cat)
-        ? prev.filter((c) => c !== cat)
-        : [...prev, cat]
-    );
+    setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!title.trim() || !content.trim() || selectedCategories.length === 0) {
-      alert('카테고리와 내용을 모두 채워주세요!');
-      return;
+    if (!title || !content || selectedCategories.length === 0 || !password) {
+      return alert("카테고리, 제목, 내용, 비밀번호를 모두 입력해주세요!");
     }
-
-    try {
-      setIsSubmitting(true);
-
-      const { error } = await supabase.from('posts').insert([
-        {
-          title: title.trim(),
-          content: content.trim(),
-          category: selectedCategories.join(', '),
-          author_name: '아이유팬',
-          artist_name: '아이유',
-        },
-      ]);
-
-      if (error) {
-        console.error('Supabase insert error:', error);
-        alert('제출 실패: ' + error.message);
-        return;
-      }
-
-      alert('안건이 제출되었습니다!');
-      navigate('/');
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      alert('알 수 없는 오류가 발생했습니다.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const { error } = await supabase.from('posts').insert([{ 
+      title, content, password, category: selectedCategories, author_name: '아이유팬' 
+    }]);
+    if (!error) navigate('/');
   };
 
-  const theme = isDarkMode
-    ? {
-        bg: 'bg-[#0f0f10]',
-        card: 'bg-[#1a1a1c]',
-        text: 'text-white',
-        sub: 'text-gray-500',
-        border: 'border-white/5',
-        input: 'text-gray-300',
-      }
-    : {
-        bg: 'bg-[#f8f9fa]',
-        card: 'bg-white',
-        text: 'text-[#1a1a1c]',
-        sub: 'text-gray-400',
-        border: 'border-gray-200',
-        input: 'text-[#1a1a1c]',
-      };
-
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text} p-6 font-sans text-left transition-colors duration-500`}>
+    <div className="min-h-screen bg-[#f8f9fa] text-[#1a1a1c] p-6 font-sans text-left">
       <div className="max-w-xl mx-auto py-8">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className={`mb-8 ${theme.sub} flex items-center gap-1 hover:text-purple-500 transition font-bold`}
-        >
+        <button onClick={() => navigate(-1)} className="mb-8 text-gray-500 flex items-center gap-1 hover:text-purple-500 transition font-bold">
           <ChevronLeft size={20} /> 뒤로가기
         </button>
-
-        <h2 className="text-2xl font-black mb-8 text-purple-600">
-          전략적 안건 제안
-        </h2>
-
+        <h2 className="text-2xl font-black mb-8 text-purple-600">전략적 안건 제안</h2>
+        
         <div className="mb-10">
-          <label className={`block text-[10px] font-bold ${theme.sub} mb-4 tracking-widest uppercase`}>
-            건의 목적 (중복 선택 가능)
-          </label>
-
+          <label className="block text-[10px] font-bold text-gray-500 mb-4 tracking-widest uppercase">건의 목적 (중복 선택 가능)</label>
           <div className="grid grid-cols-2 gap-3">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => toggleCategory(cat)}
+            {categories.map(cat => (
+              <button key={cat} type="button" onClick={() => toggleCategory(cat)}
                 className={`p-5 rounded-3xl border text-[11px] font-bold transition flex items-center justify-between ${
-                  selectedCategories.includes(cat)
-                    ? 'bg-purple-600 border-purple-500 text-white shadow-md'
-                    : `${theme.card} ${theme.border} ${theme.sub}`
-                }`}
-              >
-                {cat}
-                {selectedCategories.includes(cat) && <CheckCircle2 size={16} />}
+                  selectedCategories.includes(cat) ? 'bg-purple-600 border-purple-500 text-white shadow-md' : 'bg-white border-gray-200 text-gray-500'
+                }`}>
+                {cat} {selectedCategories.includes(cat) && <CheckCircle2 size={16} />}
               </button>
             ))}
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <input
-            className={`w-full bg-transparent text-xl font-bold border-b ${theme.border} p-4 outline-none focus:border-purple-600 transition ${theme.text}`}
-            placeholder="안건 제목을 입력하세요"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+          <input className="w-full bg-transparent text-xl font-bold border-b border-gray-200 p-4 outline-none focus:border-purple-600 transition text-[#1a1a1c]" placeholder="안건 제목을 입력하세요" value={title} onChange={e => setTitle(e.target.value)} />
+          <textarea className="w-full bg-white border border-gray-200 rounded-[2.5rem] p-8 h-80 text-[#1a1a1c] outline-none focus:ring-2 focus:ring-purple-500 transition resize-none text-sm font-medium shadow-sm" placeholder="상세 내용을 입력하세요." value={content} onChange={e => setContent(e.target.value)} />
+          
+          {/* 비밀번호 입력칸 */}
+          <input type="password" maxLength={20} className="w-full bg-white border border-gray-200 p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold shadow-sm" placeholder="수정/삭제용 비밀번호를 설정하세요" value={password} onChange={e => setPassword(e.target.value)} />
 
-          <textarea
-            className={`w-full ${theme.card} border ${theme.border} rounded-[2.5rem] p-8 h-80 ${theme.input} outline-none focus:ring-2 focus:ring-purple-500 transition resize-none text-sm font-medium shadow-sm`}
-            placeholder="상세 내용을 입력하세요. 비속어는 AI가 정제하여 소속사에 전달합니다."
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          />
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full bg-purple-600 py-6 rounded-[2rem] font-black text-lg hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/40 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? '제출 중...' : '안건 제출하기'}
-          </button>
+          <button className="w-full bg-purple-600 py-6 rounded-[2rem] font-black text-lg hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/40 text-white mt-4">안건 제출하기</button>
         </form>
       </div>
     </div>

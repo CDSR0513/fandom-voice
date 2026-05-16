@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
-import { ChevronLeft, MessageSquare, Send, Heart } from 'lucide-react';
+import { ChevronLeft, MessageSquare, Send, Heart, Edit3, Trash2, Save, X } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -14,21 +14,17 @@ const PostDetailPage = () => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [likedPosts, setLikedPosts] = useState(JSON.parse(localStorage.getItem('likedPosts') || '[]'));
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  
+  // 수정 모드 관련 상태
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editContent, setEditContent] = useState('');
 
   useEffect(() => {
     fetchPost();
     fetchComments();
-    const mode = localStorage.getItem('themeMode') || 'auto';
-    if (mode === 'auto') {
-      const hour = new Date().getHours();
-      setIsDarkMode(hour < 6 || hour >= 19);
-    } else {
-      setIsDarkMode(mode === 'dark');
-    }
   }, [id]);
 
-  // 하트 상태 로컬스토리지 동기화
   useEffect(() => {
     localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
   }, [likedPosts]);
@@ -48,15 +44,47 @@ const PostDetailPage = () => {
     if (data) setComments(data);
   };
 
-  // 🔥 상세 페이지용 공감 토글 함수
   const toggleLike = async () => {
     const isLiked = likedPosts.includes(id);
     const newCount = isLiked ? Math.max(0, (post.empathy_count || 0) - 1) : (post.empathy_count || 0) + 1;
-    
     const { error } = await supabase.from('posts').update({ empathy_count: newCount }).eq('id', id);
     if (!error) {
       setLikedPosts(prev => isLiked ? prev.filter(pId => pId !== id) : [...prev, id]);
       setPost(prev => ({ ...prev, empathy_count: newCount }));
+    }
+  };
+
+  // 🔥 수정 버튼 클릭 시
+  const handleEditClick = () => {
+    const pwd = window.prompt("글 작성 시 설정한 비밀번호를 입력하세요.");
+    if (pwd === post.password) {
+      setEditTitle(post.title);
+      setEditContent(post.content);
+      setIsEditing(true);
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
+    }
+  };
+
+  // 🔥 수정 저장
+  const handleSaveEdit = async () => {
+    const { error } = await supabase.from('posts').update({ title: editTitle, content: editContent }).eq('id', id);
+    if (!error) {
+      setPost(prev => ({ ...prev, title: editTitle, content: editContent }));
+      setIsEditing(false);
+    }
+  };
+
+  // 🔥 삭제 버튼 클릭 시
+  const handleDeleteClick = async () => {
+    const pwd = window.prompt("글 작성 시 설정한 비밀번호를 입력하세요.");
+    if (pwd === post.password) {
+      if(window.confirm("이 안건을 정말 삭제하시겠습니까?")) {
+        await supabase.from('posts').delete().eq('id', id);
+        navigate('/');
+      }
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
     }
   };
 
@@ -70,34 +98,51 @@ const PostDetailPage = () => {
     fetchPost();
   };
 
-  const theme = isDarkMode 
-    ? { bg: "bg-[#0f0f10]", card: "bg-[#1a1a1c]", text: "text-white", sub: "text-gray-400", border: "border-white/5", input: "bg-black text-white" }
-    : { bg: "bg-[#f8f9fa]", card: "bg-white", text: "text-[#1a1a1c]", sub: "text-gray-500", border: "border-gray-200", input: "bg-gray-50 text-[#1a1a1c]" };
-
-  if (!post) return <div className={`min-h-screen ${theme.bg} flex items-center justify-center ${theme.text}`}>로딩 중...</div>;
+  if (!post) return <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center text-[#1a1a1c]">로딩 중...</div>;
 
   return (
-    <div className={`min-h-screen ${theme.bg} ${theme.text} p-4 md:p-6 font-sans text-left transition-colors duration-500 pb-32`}>
+    <div className="min-h-screen bg-[#f8f9fa] text-[#1a1a1c] p-4 md:p-6 font-sans text-left pb-32">
       <div className="max-w-2xl mx-auto py-4 md:py-8">
-        <button onClick={() => navigate(-1)} className={`mb-6 md:mb-8 ${theme.sub} flex items-center gap-1 hover:text-purple-500 transition font-bold text-sm`}>
+        <button onClick={() => navigate(-1)} className="mb-6 md:mb-8 text-gray-500 flex items-center gap-1 hover:text-purple-500 transition font-bold text-sm">
           <ChevronLeft size={20} /> 목록으로
         </button>
 
-        {/* 본문 영역 */}
-        <div className={`${theme.card} p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border ${theme.border} mb-8 shadow-sm`}>
-          <div className="flex gap-2 mb-6">
+        <div className="bg-white p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] border border-gray-200 mb-8 shadow-sm relative">
+          
+          {/* 수정/삭제 메뉴 */}
+          {!isEditing && (
+            <div className="absolute top-8 right-8 flex gap-3">
+              <button onClick={handleEditClick} className="text-gray-400 hover:text-blue-500 transition"><Edit3 size={18} /></button>
+              <button onClick={handleDeleteClick} className="text-gray-400 hover:text-red-500 transition"><Trash2 size={18} /></button>
+            </div>
+          )}
+
+          <div className="flex gap-2 mb-6 mt-4">
             {post.category.map(c => <span key={c} className="bg-purple-600/10 text-purple-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">{c}</span>)}
           </div>
-          <h1 className="text-2xl md:text-3xl font-black mb-6 leading-tight">{post.title}</h1>
-          <p className={`${theme.sub} text-base leading-relaxed font-medium whitespace-pre-wrap mb-10`}>{post.content}</p>
+
+          {isEditing ? (
+            <div className="space-y-4 mb-6">
+              <input className="w-full text-2xl font-black bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none focus:border-purple-500" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+              <textarea className="w-full text-base font-medium bg-gray-50 border border-gray-200 rounded-2xl p-4 h-40 outline-none focus:border-purple-500 resize-none" value={editContent} onChange={e => setEditContent(e.target.value)} />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setIsEditing(false)} className="flex items-center gap-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-xl font-bold"><X size={16}/> 취소</button>
+                <button onClick={handleSaveEdit} className="flex items-center gap-1 px-4 py-2 bg-purple-600 text-white rounded-xl font-bold"><Save size={16}/> 저장</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl md:text-3xl font-black mb-6 leading-tight pr-10">{post.title}</h1>
+              <p className="text-gray-500 text-base leading-relaxed font-medium whitespace-pre-wrap mb-10">{post.content}</p>
+            </>
+          )}
           
-          {/* 🔥 상세 페이지 공감 버튼 추가 */}
           <div className="flex justify-start">
             <button onClick={toggleLike}
               className={`flex items-center gap-2 px-6 py-3 rounded-full transition-all border ${
                 likedPosts.includes(id) 
                 ? 'bg-red-500/10 border-red-500/20 text-red-500 font-bold' 
-                : `${theme.bg} ${theme.border} text-gray-400`
+                : 'bg-[#f8f9fa] border-gray-200 text-gray-400'
               }`}>
               <Heart size={20} fill={likedPosts.includes(id) ? "currentColor" : "none"} />
               <span className="text-sm font-bold">공감 {post.empathy_count || 0}</span>
@@ -105,7 +150,6 @@ const PostDetailPage = () => {
           </div>
         </div>
 
-        {/* 달글(댓글) 영역 */}
         <div className="mb-6 flex items-center gap-2 px-2">
           <MessageSquare size={18} className="text-purple-500" />
           <h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3>
@@ -113,21 +157,20 @@ const PostDetailPage = () => {
 
         <div className="space-y-4 mb-10">
           {comments.map(comment => (
-            <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm`}>
+            <div key={comment.id} className="bg-white p-6 rounded-[2rem] border border-gray-200 shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <span className="font-bold text-sm text-purple-600">{comment.author_name}</span>
               </div>
-              <p className={`${theme.text} text-sm font-medium`}>{comment.content}</p>
+              <p className="text-[#1a1a1c] text-sm font-medium">{comment.content}</p>
             </div>
           ))}
-          {comments.length === 0 && <div className={`text-center py-10 ${theme.sub} text-sm`}>아직 작성된 댓글이 없습니다. 첫 의견을 남겨주세요!</div>}
+          {comments.length === 0 && <div className="text-center py-10 text-gray-500 text-sm">아직 작성된 댓글이 없습니다. 첫 의견을 남겨주세요!</div>}
         </div>
 
-        {/* 댓글 작성 폼 (하단 고정 느낌) */}
         <form onSubmit={handleAddComment} className="flex gap-3">
           <input 
-            className={`flex-1 ${theme.input} border ${theme.border} rounded-full px-6 py-4 outline-none focus:border-purple-600 transition text-sm font-medium`}
-            placeholder="동의하거나 추가할 의견을 남겨주세요."
+            className="flex-1 bg-gray-50 border border-gray-200 text-[#1a1a1c] rounded-full px-6 py-4 outline-none focus:border-purple-600 transition text-sm font-medium"
+            placeholder="동의하거나 추가할 의견을 댓글로 남겨주세요."
             value={newComment}
             onChange={e => setNewComment(e.target.value)}
           />
