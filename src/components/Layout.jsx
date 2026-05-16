@@ -17,9 +17,7 @@ const Layout = ({ children }) => {
         setIsDarkMode(mode === 'dark');
       }
     };
-
     syncTheme();
-    // 다른 페이지에서 테마를 변경했을 때 실시간으로 상단바에 반영되도록 0.5초마다 체크합니다.
     const interval = setInterval(syncTheme, 500);
     return () => clearInterval(interval);
   }, []);
@@ -37,7 +35,7 @@ const Layout = ({ children }) => {
               <Mic2 size={18} className="text-white" />
             </div>
             <div>
-              <h1 className={`text-base font-black ${theme.text} transition-colors`}>아이유 팬덤 보이스</h1>
+              <h1 className={`text-base font-black ${theme.text} transition-colors`}>{/* 제목 폰트 색상 연동 */}아이유 팬덤 보이스</h1>
               <p className={`text-[10px] ${theme.subText} font-bold transition-colors`}>아이유 전용 여론 수집 플랫폼</p>
             </div>
           </Link>
