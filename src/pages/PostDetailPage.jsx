@@ -7,11 +7,10 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// DB의 텍스트를 배열로 파싱하는 안전한 함수
 const parseMediaUrls = (urlStr) => {
   if (!urlStr) return [];
   try { return JSON.parse(urlStr); } 
-  catch { return [urlStr]; } // 이전 버전의 단일 주소 호환용
+  catch { return [urlStr]; } 
 };
 
 const PostDetailPage = () => {
@@ -30,18 +29,27 @@ const PostDetailPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
-  const [editMediaUrls, setEditMediaUrls] = useState([]); // 본문 수정용 첨부파일 배열
+  const [editMediaUrls, setEditMediaUrls] = useState([]); 
   const [isPostUploading, setIsPostUploading] = useState(false);
   const postFileInputRef = useRef(null);
 
   const [likedPosts, setLikedPosts] = useState(JSON.parse(localStorage.getItem('likedPosts') || '[]'));
+  
+  // 🔥 댓글 수정 전용 상태
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentContent, setEditCommentContent] = useState('');
+  const [editCommentMediaUrls, setEditCommentMediaUrls] = useState([]);
+  const [isCommentEditUploading, setIsCommentEditUploading] = useState(false);
 
   useEffect(() => {
     fetchPost(); fetchComments();
-    const mode = localStorage.getItem('themeMode') || 'auto';
-    setIsDarkMode(mode === 'dark' || (mode === 'auto' && (new Date().getHours() < 6 || new Date().getHours() >= 19)));
+    const syncTheme = () => {
+      const mode = localStorage.getItem('themeMode') || 'auto';
+      setIsDarkMode(mode === 'dark' || (mode === 'auto' && (new Date().getHours() < 6 || new Date().getHours() >= 19)));
+    };
+    syncTheme();
+    const interval = setInterval(syncTheme, 500);
+    return () => clearInterval(interval);
   }, [id]);
 
   const fetchPost = async () => {
@@ -57,7 +65,6 @@ const PostDetailPage = () => {
     if (data) setComments(data.map(c => ({ ...c, parsedUrls: parseMediaUrls(c.media_url) })));
   };
 
-  // 공통 다중 업로드 함수
   const uploadFiles = async (files, setUploadingState, setUrlsState) => {
     if (!files.length) return;
     setUploadingState(true);
@@ -86,14 +93,23 @@ const PostDetailPage = () => {
     }
   };
 
+  // 🔥 댓글 수정 시작 (파일 배열도 불러오기)
   const startEditComment = (comment) => {
     const pwd = window.prompt("댓글 비밀번호를 입력하세요.");
-    if (pwd === comment.password) { setEditingCommentId(comment.id); setEditCommentContent(comment.content); }
+    if (pwd === comment.password) { 
+      setEditingCommentId(comment.id); 
+      setEditCommentContent(comment.content); 
+      setEditCommentMediaUrls(comment.parsedUrls || []); 
+    }
     else alert("비밀번호 불일치");
   };
 
+  // 🔥 댓글 수정 저장 (파일 배열도 같이 저장)
   const handleSaveCommentEdit = async (commentId) => {
-    await supabase.from('comments').update({ content: editCommentContent }).eq('id', commentId);
+    await supabase.from('comments').update({ 
+      content: editCommentContent, 
+      media_url: JSON.stringify(editCommentMediaUrls) 
+    }).eq('id', commentId);
     setEditingCommentId(null); fetchComments();
   };
 
@@ -165,12 +181,11 @@ const PostDetailPage = () => {
               <input className={`w-full text-2xl font-black ${theme.input} border ${theme.border} rounded-xl p-4 outline-none`} value={editTitle} onChange={e => setEditTitle(e.target.value)} />
               <textarea className={`w-full text-base font-medium ${theme.input} border ${theme.border} rounded-2xl p-4 h-40 resize-none outline-none`} value={editContent} onChange={e => setEditContent(e.target.value)} />
               
-              {/* 본문 첨부파일 수정 영역 */}
               <div className={`border ${theme.border} p-4 rounded-xl`}>
                 <button type="button" onClick={() => postFileInputRef.current?.click()} className={`text-xs font-bold ${theme.sub} flex gap-2`}>
                   <ImageIcon size={16}/> 파일 추가하기
                 </button>
-                <input type="file" ref={postFileInputRef} multiple className="hidden" onChange={e => uploadFiles(Array.from(e.target.files), setIsPostUploading, setEditMediaUrls)} />
+                <input type="file" ref={postFileInputRef} multiple accept="image/*,video/*" className="hidden" onChange={e => uploadFiles(Array.from(e.target.files), setIsPostUploading, setEditMediaUrls)} />
                 {isPostUploading && <Loader2 size={14} className="animate-spin text-purple-600 mt-2" />}
                 <div className="flex flex-wrap gap-2 mt-3">
                   {editMediaUrls.map((url, idx) => (
@@ -212,10 +227,9 @@ const PostDetailPage = () => {
         
         <div className="space-y-4 mb-10">
           {comments.map(comment => (
-            <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm`}>
+            <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm relative`}>
               <div className="flex justify-between items-center mb-3">
                 <span className="font-bold text-sm text-purple-600">{comment.author_name}</span>
-                {/* 🔥 모바일에서 버튼이 밀리지 않도록 flex-shrink-0 적용 */}
                 {editingCommentId !== comment.id && (
                   <div className="flex gap-3 flex-shrink-0 ml-2">
                     <button onClick={() => startEditComment(comment)} className={`${theme.sub} hover:text-blue-500`}><Edit3 size={16}/></button>
@@ -227,9 +241,27 @@ const PostDetailPage = () => {
               {editingCommentId === comment.id ? (
                 <div className="mt-2">
                   <textarea className={`w-full p-3 ${theme.input} border ${theme.border} rounded-xl text-sm outline-none resize-none`} value={editCommentContent} onChange={e => setEditCommentContent(e.target.value)} />
-                  <div className="flex justify-end gap-2 mt-2">
-                    <button onClick={() => setEditingCommentId(null)} className={`px-3 py-1 border ${theme.border} text-xs font-bold rounded-lg`}>취소</button>
-                    <button onClick={() => handleSaveCommentEdit(comment.id)} className="px-3 py-1 bg-purple-600 text-white text-xs font-bold rounded-lg">저장</button>
+                  
+                  {/* 🔥 댓글 수정 파일 첨부 영역 */}
+                  <div className={`mt-3 border ${theme.border} p-3 rounded-xl`}>
+                    <button type="button" onClick={() => document.getElementById(`edit-comment-file-${comment.id}`).click()} className={`text-xs font-bold ${theme.sub} flex gap-2`}>
+                      <ImageIcon size={14}/> 사진/영상 추가
+                    </button>
+                    <input id={`edit-comment-file-${comment.id}`} type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => uploadFiles(Array.from(e.target.files), setIsCommentEditUploading, setEditCommentMediaUrls)} />
+                    {isCommentEditUploading && <Loader2 size={14} className="animate-spin text-purple-600 mt-2" />}
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {editCommentMediaUrls.map((url, idx) => (
+                        <div key={idx} className="relative w-12 h-12 rounded-lg overflow-hidden border">
+                          {url.match(/\.(mp4|webm|ogg)$/i) ? <video src={url} className="w-full h-full object-cover"/> : <img src={url} className="w-full h-full object-cover"/>}
+                          <button onClick={() => setEditCommentMediaUrls(prev => prev.filter((_, i) => i !== idx))} className="absolute top-0 right-0 bg-red-500 p-0.5 text-white rounded-full"><X size={8}/></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-3">
+                    <button onClick={() => setEditingCommentId(null)} className={`px-3 py-1.5 border ${theme.border} text-xs font-bold rounded-lg`}>취소</button>
+                    <button onClick={() => handleSaveCommentEdit(comment.id)} className="px-3 py-1.5 bg-purple-600 text-white text-xs font-bold rounded-lg">저장</button>
                   </div>
                 </div>
               ) : (

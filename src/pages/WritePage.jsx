@@ -117,7 +117,7 @@ const WritePage = () => {
           <div className={`${theme.card} border ${theme.border} p-6 rounded-2xl`}>
             <button type="button" onClick={() => fileInputRef.current?.click()} className={`flex items-center gap-2 text-xs font-bold ${theme.sub} hover:text-purple-600 transition`}>
               <ImageIcon size={18} />
-              <span>사진 / 동영상 / 움짤 다중 첨부</span>
+              <span>사진 / 동영상 / 움짤 첨부</span>
             </button>
             <input type="file" ref={fileInputRef} multiple accept="image/*,video/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
             
