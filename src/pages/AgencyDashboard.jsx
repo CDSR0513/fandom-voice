@@ -22,7 +22,6 @@ const AgencyDashboard = () => {
   useEffect(() => { 
     fetchPosts(); 
     
-    // 🔥 홈화면 테마와 동기화
     const syncTheme = () => {
       const mode = localStorage.getItem('themeMode') || 'auto';
       if (mode === 'auto') {
@@ -39,11 +38,24 @@ const AgencyDashboard = () => {
   const fetchPosts = async () => {
     const { data } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
     if (data) {
-      setPosts(data.map(p => ({ 
-        ...p, 
-        domains: Array.isArray(p.category) ? p.category : [p.category],
-        parsedUrls: parseMediaUrls(p.media_url) // 파일 배열 안전하게 가져오기
-      })));
+      setPosts(data.map(p => {
+        // 🔥 예전 카테고리(agency, goods 등)를 '기획 대책 강구'로 강제 변환하는 로직 복구
+        let catArray = Array.isArray(p.category) ? p.category : [p.category];
+        const isLegacy = catArray.some(c => {
+          const lowerC = String(c).toLowerCase();
+          return ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(lowerC);
+        });
+        
+        if (isLegacy || !catArray.length || !catArray[0]) {
+          catArray = ['기획 대책 강구'];
+        }
+
+        return { 
+          ...p, 
+          domains: catArray,
+          parsedUrls: parseMediaUrls(p.media_url)
+        };
+      }));
     }
   };
 
@@ -90,7 +102,6 @@ const AgencyDashboard = () => {
                     </div>
                     <div className={`${theme.sub} text-sm mt-2 whitespace-pre-wrap`}>{post.content}</div>
                     
-                    {/* 소속사 화면에서 엑박 방지: 첨부 파일이 있다면 첫 번째 사진만 대표로 렌더링 */}
                     {post.parsedUrls.length > 0 && (
                       <div className="mt-4 rounded-xl overflow-hidden max-h-40 max-w-sm border border-gray-200/20 bg-black/5">
                         {post.parsedUrls[0].match(/\.(mp4|webm|ogg)$/i) ? (
