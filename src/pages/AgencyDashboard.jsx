@@ -13,7 +13,6 @@ const parseMediaUrls = (urlStr) => {
   catch { return [urlStr]; } 
 };
 
-// 🔥 카테고리 괄호 포장지([" "])를 예쁘게 벗겨주는 해독기
 const parseCategory = (cat) => {
   if (!cat) return ['기타'];
   if (Array.isArray(cat)) return cat;
@@ -23,11 +22,21 @@ const parseCategory = (cat) => {
   } catch { return [cat]; }
 };
 
+const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
+const mapLegacyCategory = (cat) => {
+  if (NEW_CATEGORIES.includes(cat)) return cat;
+  const lowerC = String(cat).toLowerCase();
+  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+  return '기타';
+};
+
 const AgencyDashboard = () => {
   const [posts, setPosts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
 
   useEffect(() => { 
     fetchPosts(); 
@@ -49,9 +58,7 @@ const AgencyDashboard = () => {
     if (data) {
       setPosts(data.map(p => {
         let catArray = parseCategory(p.category);
-        const isLegacy = catArray.some(c => ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(String(c).toLowerCase()));
-        if (isLegacy) catArray = ['기획 대책 강구'];
-
+        catArray = [...new Set(catArray.map(mapLegacyCategory))]; 
         return { 
           ...p, 
           domains: catArray,
@@ -80,10 +87,10 @@ const AgencyDashboard = () => {
           <button onClick={() => setSelectedCategory('전체')} className={`px-6 py-2 rounded-2xl text-xs font-bold transition w-full md:w-auto ${theme.card} border ${theme.border} ${theme.sub} hover:border-purple-600/30`}>전체보기</button>
         </header>
 
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-10">
-          {categories.map(cat => (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-10">
+          {NEW_CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setSelectedCategory(cat)} className={`p-5 md:p-6 rounded-3xl md:rounded-[2rem] border transition text-left ${selectedCategory === cat ? 'bg-purple-600 border-purple-500 text-white shadow-md' : `${theme.card} ${theme.border}`}`}>
-              <span className={`text-[9px] font-black uppercase ${selectedCategory === cat ? 'text-purple-200' : 'text-purple-600'}`}>{cat}</span>
+              <span className={`text-[10px] font-black uppercase ${selectedCategory === cat ? 'text-purple-200' : 'text-purple-600'}`}>{cat}</span>
               <h4 className="text-2xl font-black mt-2">{posts.filter(p => p.domains.includes(cat)).length}</h4>
             </button>
           ))}

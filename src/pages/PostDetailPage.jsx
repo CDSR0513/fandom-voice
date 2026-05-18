@@ -7,10 +7,24 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// 🔥 전능하신 관리자 슈퍼키
+const MASTER_PWD = 'whogall_dlwlrma_0516!';
+
 const parseMediaUrls = (urlStr) => {
   if (!urlStr) return [];
   try { return JSON.parse(urlStr); } 
   catch { return [urlStr]; } 
+};
+
+const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
+const mapLegacyCategory = (cat) => {
+  if (NEW_CATEGORIES.includes(cat)) return cat;
+  const lowerC = String(cat).toLowerCase();
+  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+  return '기타';
 };
 
 const PostDetailPage = () => {
@@ -61,10 +75,7 @@ const PostDetailPage = () => {
       } catch {
         catArray = [data.category || '기타'];
       }
-
-      // 🔥 예전 카테고리(AGENCY, GOODS 등)를 강제로 '기획 대책 강구'로 덮어씌우는 로직
-      const isLegacy = catArray.some(c => ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(String(c).toLowerCase()));
-      if (isLegacy) catArray = ['기획 대책 강구'];
+      catArray = [...new Set(catArray.map(mapLegacyCategory))];
 
       setPost({ ...data, category: catArray, parsedUrls: parseMediaUrls(data.media_url) });
     }
@@ -103,14 +114,15 @@ const PostDetailPage = () => {
     }
   };
 
+  // 🔥 마스터 비밀번호로도 통과!
   const startEditComment = (comment) => {
-    const pwd = window.prompt("댓글 비밀번호를 입력하세요.");
-    if (pwd === comment.password) { 
+    const pwd = window.prompt("댓글 비밀번호를 입력하세요. (또는 마스터키)");
+    if (pwd === comment.password || pwd === MASTER_PWD) { 
       setEditingCommentId(comment.id); 
       setEditCommentContent(comment.content); 
       setEditCommentMediaUrls(comment.parsedUrls || []); 
     }
-    else alert("비밀번호가 일치하지 않습니다.");
+    else alert("권한이 없습니다.");
   };
 
   const handleSaveCommentEdit = async (commentId) => {
@@ -122,14 +134,14 @@ const PostDetailPage = () => {
   };
 
   const handleDeleteComment = async (comment) => {
-    const pwd = window.prompt("비밀번호를 입력하세요.");
-    if (pwd === comment.password) {
+    const pwd = window.prompt("비밀번호를 입력하세요. (또는 마스터키)");
+    if (pwd === comment.password || pwd === MASTER_PWD) {
       if(window.confirm("삭제하시겠습니까?")) {
         await supabase.from('comments').delete().eq('id', comment.id);
         await supabase.from('posts').update({ comment_count: Math.max(0, (post.comment_count || 0) - 1) }).eq('id', id);
         fetchComments(); fetchPost();
       }
-    } else alert("비밀번호가 일치하지 않습니다.");
+    } else alert("권한이 없습니다.");
   };
 
   const toggleLike = async () => {
@@ -141,10 +153,10 @@ const PostDetailPage = () => {
   };
 
   const handleEditClick = () => {
-    const pwd = window.prompt("글 설정 비밀번호를 입력하세요.");
-    if (pwd === post.password) { 
+    const pwd = window.prompt("글 설정 비밀번호를 입력하세요. (또는 마스터키)");
+    if (pwd === post.password || pwd === MASTER_PWD) { 
       setIsEditing(true); setEditTitle(post.title); setEditContent(post.content); setEditMediaUrls(post.parsedUrls); 
-    } else alert("비밀번호가 일치하지 않습니다.");
+    } else alert("권한이 없습니다.");
   };
 
   const handleSaveEdit = async () => {
@@ -153,13 +165,13 @@ const PostDetailPage = () => {
   };
 
   const handleDeleteClick = async () => {
-    const pwd = window.prompt("비밀번호를 입력하세요.");
-    if (pwd === post.password) {
+    const pwd = window.prompt("비밀번호를 입력하세요. (또는 마스터키)");
+    if (pwd === post.password || pwd === MASTER_PWD) {
       if(window.confirm("삭제하시겠습니까?")) { await supabase.from('posts').delete().eq('id', id); navigate('/'); }
-    } else alert("비밀번호가 일치하지 않습니다.");
+    } else alert("권한이 없습니다.");
   };
 
-  // 🔥 댓글 작성자 분류기 (글쓴팬 vs 아이유팬1, 아이유팬2)
+  // 🔥 관리자 뱃지 기능 추가
   const getProcessedComments = () => {
     if (!post) return [];
     const pwMap = new Map();
@@ -168,11 +180,13 @@ const PostDetailPage = () => {
     return comments.map(c => {
       let dName = '아이유팬';
       if (c.password && post.password && c.password === post.password) {
-        dName = '글쓴팬 ✍️'; // 글 작성자와 비밀번호가 같으면 글쓴팬으로 표시
+        dName = '글쓴팬 ✍️';
+      } else if (c.password === MASTER_PWD) {
+        dName = '관리자 🛠️'; // 마스터키를 쓰면 관리자로 등장
       } else {
         const key = c.password || `unknown-${c.id}`;
         if (!pwMap.has(key)) pwMap.set(key, fanCount++);
-        dName = `아이유팬 ${pwMap.get(key)}`; // 고유 비밀번호별로 번호 부여
+        dName = `아이유팬 ${pwMap.get(key)}`; 
       }
       return { ...c, displayName: dName };
     });
@@ -253,11 +267,10 @@ const PostDetailPage = () => {
         <div className="mb-6 flex items-center gap-2 px-2"><MessageSquare size={18} className="text-purple-500" /><h3 className="font-bold text-lg">댓글 {post.comment_count || 0}개</h3></div>
         
         <div className="space-y-4 mb-10">
-          {/* 🔥 처리된 댓글(넘버링 포함) 목록을 렌더링합니다 */}
           {getProcessedComments().map(comment => (
             <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm relative`}>
               <div className="flex justify-between items-center mb-3">
-                <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : 'text-purple-600'}`}>
+                <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : comment.displayName.includes('관리자') ? 'text-red-500' : 'text-purple-600'}`}>
                   {comment.displayName}
                 </span>
                 {editingCommentId !== comment.id && (

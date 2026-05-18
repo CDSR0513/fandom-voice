@@ -12,15 +12,16 @@ const WritePage = () => {
   const [content, setContent] = useState('');
   const [password, setPassword] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [mediaUrls, setMediaUrls] = useState([]); // 🔥 여러 개 저장을 위한 배열
+  const [mediaUrls, setMediaUrls] = useState([]); 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(''); // 모바일 제출 오류 표시용
+  const [errorMessage, setErrorMessage] = useState(''); 
   const [isDarkMode, setIsDarkMode] = useState(true);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
-  const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
+  // 🔥 새로 개편된 카테고리 목록
+  const categories = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
 
   useEffect(() => {
     const mode = localStorage.getItem('themeMode') || 'auto';
@@ -29,7 +30,6 @@ const WritePage = () => {
 
   const toggleCategory = (cat) => setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
 
-  // 🔥 무제한 다중 파일 업로드 로직
   const handleFileUpload = async (e) => {
     try {
       const files = Array.from(e.target.files);
@@ -73,7 +73,7 @@ const WritePage = () => {
         category: selectedCategories, 
         author_name: '아이유팬',
         artist_name: '아이유', 
-        media_url: JSON.stringify(mediaUrls) // 배열을 통째로 텍스트로 변환해서 저장
+        media_url: JSON.stringify(mediaUrls) 
       }]);
 
       if (error) throw new Error(error.message);
@@ -123,7 +123,6 @@ const WritePage = () => {
             
             {isUploading && <div className="flex items-center gap-2 text-xs text-purple-600 mt-3"><Loader2 size={14} className="animate-spin" /> 업로드 중...</div>}
             
-            {/* 첨부된 파일 미리보기 목록 및 삭제 버튼 */}
             {mediaUrls.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-4">
                 {mediaUrls.map((url, idx) => (
@@ -136,7 +135,7 @@ const WritePage = () => {
             )}
           </div>
 
-          <input type="password" maxLength={20} className={`w-full ${theme.card} border ${theme.border} p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold`} placeholder="수정/삭제용 비밀번호를 설정하세요" value={password} onChange={e => setPassword(e.target.value)} />
+          <input type="password" maxLength={25} className={`w-full ${theme.card} border ${theme.border} p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold`} placeholder="수정/삭제용 비밀번호를 설정하세요" value={password} onChange={e => setPassword(e.target.value)} />
 
           {errorMessage && <p className="text-red-500 text-sm font-bold px-2">{errorMessage}</p>}
 

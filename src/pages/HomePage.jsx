@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Link, useNavigate } from 'react-router-dom';
-import { MessageSquare, Heart, PenSquare, Sparkles, Building2, Sun, Moon, Monitor } from 'lucide-react';
+import { MessageSquare, Heart, PenSquare, Sparkles, Sun, Moon, Monitor } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,6 +18,18 @@ const parseCategory = (cat) => {
   }
 };
 
+// 🔥 과거 카테고리를 새 카테고리로 영리하게 바꿔주는 로직
+const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
+const mapLegacyCategory = (cat) => {
+  if (NEW_CATEGORIES.includes(cat)) return cat;
+  const lowerC = String(cat).toLowerCase();
+  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+  return '기타';
+};
+
 const HomePage = () => {
   const [posts, setPosts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('전체');
@@ -25,8 +37,6 @@ const HomePage = () => {
   const [themeMode, setThemeMode] = useState(localStorage.getItem('themeMode') || 'auto');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const navigate = useNavigate();
-
-  const categories = ['소속사 피드백 요청', '연예인 피드백 요청', '악플 대책 강구', '홍보 대책 강구', '기획 대책 강구', '기타'];
 
   useEffect(() => {
     fetchPosts();
@@ -52,8 +62,8 @@ const HomePage = () => {
     if (!error && data) {
       setPosts(data.map(p => {
         let catArray = parseCategory(p.category);
-        const isLegacy = catArray.some(c => ['goods', 'agency', '소속사 피드백', '굿즈/공연'].includes(String(c).toLowerCase()));
-        if (isLegacy) catArray = ['기획 대책 강구'];
+        // 옛날 태그를 새 태그로 변환 및 중복 제거
+        catArray = [...new Set(catArray.map(mapLegacyCategory))]; 
         return { ...p, category: catArray };
       }));
     }
@@ -101,7 +111,7 @@ const HomePage = () => {
 
         <div className="flex gap-2 overflow-x-auto pb-4 mb-6 no-scrollbar snap-x">
           <button onClick={() => setSelectedCategory('전체')} className={`px-5 py-3 rounded-full text-xs font-black transition-all flex-shrink-0 snap-start ${selectedCategory === '전체' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : `${theme.card} border ${theme.border} ${theme.sub}`}`}>전체</button>
-          {categories.map(cat => (
+          {NEW_CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-3 rounded-full text-xs font-black transition-all flex-shrink-0 snap-start ${selectedCategory === cat ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : `${theme.card} border ${theme.border} ${theme.sub}`}`}>{cat}</button>
           ))}
         </div>
