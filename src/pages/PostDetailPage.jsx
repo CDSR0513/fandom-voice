@@ -6,14 +6,19 @@ import { ChevronLeft, MessageSquare, Send, Heart, Edit3, Trash2, Save, X, Image 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// 🔥 전능하신 관리자 슈퍼키
 const MASTER_PWD = 'whogall_dlwlrma_0516!';
 
 const parseMediaUrls = (urlStr) => {
   if (!urlStr) return [];
   try { return JSON.parse(urlStr); } 
   catch { return [urlStr]; } 
+};
+
+// 🔥 날짜 예쁘게 바꿔주는 포맷 함수
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
 const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
@@ -76,7 +81,6 @@ const PostDetailPage = () => {
         catArray = [data.category || '기타'];
       }
       catArray = [...new Set(catArray.map(mapLegacyCategory))];
-
       setPost({ ...data, category: catArray, parsedUrls: parseMediaUrls(data.media_url) });
     }
   };
@@ -114,7 +118,6 @@ const PostDetailPage = () => {
     }
   };
 
-  // 🔥 마스터 비밀번호로도 통과!
   const startEditComment = (comment) => {
     const pwd = window.prompt("댓글 비밀번호를 입력하세요. (또는 마스터키)");
     if (pwd === comment.password || pwd === MASTER_PWD) { 
@@ -126,9 +129,12 @@ const PostDetailPage = () => {
   };
 
   const handleSaveCommentEdit = async (commentId) => {
+    // 🔥 수정된 시간 함께 저장
+    const now = new Date().toISOString();
     await supabase.from('comments').update({ 
       content: editCommentContent, 
-      media_url: JSON.stringify(editCommentMediaUrls) 
+      media_url: JSON.stringify(editCommentMediaUrls),
+      updated_at: now
     }).eq('id', commentId);
     setEditingCommentId(null); fetchComments();
   };
@@ -160,7 +166,14 @@ const PostDetailPage = () => {
   };
 
   const handleSaveEdit = async () => {
-    await supabase.from('posts').update({ title: editTitle, content: editContent, media_url: JSON.stringify(editMediaUrls) }).eq('id', id);
+    // 🔥 본문 수정된 시간 함께 저장
+    const now = new Date().toISOString();
+    await supabase.from('posts').update({ 
+      title: editTitle, 
+      content: editContent, 
+      media_url: JSON.stringify(editMediaUrls),
+      updated_at: now
+    }).eq('id', id);
     setIsEditing(false); fetchPost();
   };
 
@@ -171,7 +184,6 @@ const PostDetailPage = () => {
     } else alert("권한이 없습니다.");
   };
 
-  // 🔥 관리자 뱃지 기능 추가
   const getProcessedComments = () => {
     if (!post) return [];
     const pwMap = new Map();
@@ -182,7 +194,7 @@ const PostDetailPage = () => {
       if (c.password && post.password && c.password === post.password) {
         dName = '글쓴팬 ✍️';
       } else if (c.password === MASTER_PWD) {
-        dName = '관리자 🛠️'; // 마스터키를 쓰면 관리자로 등장
+        dName = '관리자 🛠️'; 
       } else {
         const key = c.password || `unknown-${c.id}`;
         if (!pwMap.has(key)) pwMap.set(key, fanCount++);
@@ -213,8 +225,13 @@ const PostDetailPage = () => {
             </div>
           )}
 
-          <div className="flex gap-2 mb-6 mt-4">
+          <div className="flex gap-2 mb-4 mt-4">
             {post.category.map(c => <span key={c} className="bg-purple-600/10 text-purple-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">{c}</span>)}
+          </div>
+          
+          {/* 🔥 작성/수정일시 표시 (본문) */}
+          <div className={`text-[11px] ${theme.sub} font-medium mb-8`}>
+            {formatDate(post.created_at)} {post.updated_at && <span className="ml-1 opacity-70">(수정됨: {formatDate(post.updated_at)})</span>}
           </div>
 
           {isEditing ? (
@@ -269,10 +286,17 @@ const PostDetailPage = () => {
         <div className="space-y-4 mb-10">
           {getProcessedComments().map(comment => (
             <div key={comment.id} className={`${theme.card} p-6 rounded-[2rem] border ${theme.border} shadow-sm relative`}>
-              <div className="flex justify-between items-center mb-3">
-                <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : comment.displayName.includes('관리자') ? 'text-red-500' : 'text-purple-600'}`}>
-                  {comment.displayName}
-                </span>
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : comment.displayName.includes('관리자') ? 'text-red-500' : 'text-purple-600'}`}>
+                    {comment.displayName}
+                  </span>
+                  {/* 🔥 작성/수정일시 표시 (댓글) */}
+                  <div className={`text-[10px] ${theme.sub} mt-1 font-medium`}>
+                    {formatDate(comment.created_at)} {comment.updated_at && <span className="opacity-70">(수정됨: {formatDate(comment.updated_at)})</span>}
+                  </div>
+                </div>
+                
                 {editingCommentId !== comment.id && (
                   <div className="flex gap-3 flex-shrink-0 ml-2">
                     <button onClick={() => startEditComment(comment)} className={`${theme.sub} hover:text-blue-500`}><Edit3 size={16}/></button>
@@ -308,7 +332,7 @@ const PostDetailPage = () => {
                 </div>
               ) : (
                 <>
-                  <p className={`${theme.text} text-sm font-medium mb-3 whitespace-pre-wrap break-all`}>{comment.content}</p>
+                  <p className={`${theme.text} text-sm font-medium mb-3 whitespace-pre-wrap break-all mt-2`}>{comment.content}</p>
                   <div className="flex flex-wrap gap-2">
                     {comment.parsedUrls.map((url, idx) => (
                       <div key={idx} className="rounded-xl overflow-hidden h-32 max-w-xs border border-gray-200/20 flex items-center justify-center bg-black/5">
@@ -334,7 +358,7 @@ const PostDetailPage = () => {
             </div>
           )}
           <div className="flex gap-2">
-            <input type="password" placeholder="비밀번호" maxLength={10} className={`w-1/3 ${theme.input} border ${theme.border} rounded-xl px-4 py-3 text-sm outline-none`} value={commentPassword} onChange={e => setCommentPassword(e.target.value)} />
+            <input type="password" placeholder="비밀번호" maxLength={25} className={`w-1/3 ${theme.input} border ${theme.border} rounded-xl px-4 py-3 text-sm outline-none`} value={commentPassword} onChange={e => setCommentPassword(e.target.value)} />
             <button type="button" onClick={() => commentFileInputRef.current?.click()} className={`flex-shrink-0 flex items-center justify-center border ${theme.border} w-12 rounded-xl ${theme.sub} hover:text-purple-600 transition`}>
               <ImageIcon size={20} />
             </button>

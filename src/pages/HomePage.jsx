@@ -18,7 +18,13 @@ const parseCategory = (cat) => {
   }
 };
 
-// 🔥 과거 카테고리를 새 카테고리로 영리하게 바꿔주는 로직
+// 🔥 날짜 포맷 함수 추가
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
 const mapLegacyCategory = (cat) => {
   if (NEW_CATEGORIES.includes(cat)) return cat;
@@ -62,7 +68,6 @@ const HomePage = () => {
     if (!error && data) {
       setPosts(data.map(p => {
         let catArray = parseCategory(p.category);
-        // 옛날 태그를 새 태그로 변환 및 중복 제거
         catArray = [...new Set(catArray.map(mapLegacyCategory))]; 
         return { ...p, category: catArray };
       }));
@@ -119,11 +124,19 @@ const HomePage = () => {
         <div className="space-y-4 mb-20">
           {filteredPosts.map(post => (
             <Link to={`/post/${post.id}`} key={post.id} className={`block ${theme.card} p-6 md:p-8 rounded-[2rem] border ${theme.border} hover:border-purple-500/30 transition-all shadow-sm hover:shadow-xl group text-left`}>
-              <div className="flex flex-wrap gap-1 mb-4">
-                {post.category.map(c => (
-                  <span key={c} className="bg-purple-600/10 text-purple-500 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider">{c}</span>
-                ))}
+              
+              {/* 🔥 상단 카테고리와 함께 작성일시 표시 */}
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-wrap gap-1">
+                  {post.category.map(c => (
+                    <span key={c} className="bg-purple-600/10 text-purple-500 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider">{c}</span>
+                  ))}
+                </div>
+                <div className={`text-[10px] font-medium ${theme.sub}`}>
+                  {formatDate(post.created_at)}
+                </div>
               </div>
+
               <h3 className={`text-lg font-bold mb-2 group-hover:text-purple-500 transition-colors ${theme.text}`}>{post.title}</h3>
               <p className={`${theme.sub} text-xs font-medium leading-relaxed mb-6 line-clamp-2`}>{post.content}</p>
               
