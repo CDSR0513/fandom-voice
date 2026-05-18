@@ -20,7 +20,6 @@ const WritePage = () => {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
-  // 🔥 새로 개편된 카테고리 목록
   const categories = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
 
   useEffect(() => {
@@ -110,9 +109,21 @@ const WritePage = () => {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <input className={`w-full bg-transparent text-xl font-bold border-b ${theme.border} p-4 outline-none focus:border-purple-600 transition ${theme.text}`} placeholder="안건 제목을 입력하세요" value={title} onChange={e => setTitle(e.target.value)} />
-          <textarea className={`w-full ${theme.card} border ${theme.border} rounded-[2.5rem] p-8 h-60 ${theme.text} outline-none focus:border-purple-500 transition resize-none text-sm font-medium`} placeholder="상세 내용을 입력하세요." value={content} onChange={e => setContent(e.target.value)} />
+        {/* 🔥 브라우저 자동완성 끄기: autoComplete="off" 추가 */}
+        <form onSubmit={handleSubmit} className="space-y-6" autoComplete="off">
+          <input 
+            className={`w-full bg-transparent text-xl font-bold border-b ${theme.border} p-4 outline-none focus:border-purple-600 transition ${theme.text}`} 
+            placeholder="안건 제목을 입력하세요" 
+            value={title} 
+            onChange={e => setTitle(e.target.value)} 
+            autoComplete="off" 
+          />
+          <textarea 
+            className={`w-full ${theme.card} border ${theme.border} rounded-[2.5rem] p-8 h-60 ${theme.text} outline-none focus:border-purple-500 transition resize-none text-sm font-medium`} 
+            placeholder="상세 내용을 입력하세요." 
+            value={content} 
+            onChange={e => setContent(e.target.value)} 
+          />
           
           <div className={`${theme.card} border ${theme.border} p-6 rounded-2xl`}>
             <button type="button" onClick={() => fileInputRef.current?.click()} className={`flex items-center gap-2 text-xs font-bold ${theme.sub} hover:text-purple-600 transition`}>
@@ -135,7 +146,16 @@ const WritePage = () => {
             )}
           </div>
 
-          <input type="password" maxLength={25} className={`w-full ${theme.card} border ${theme.border} p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold`} placeholder="수정/삭제용 비밀번호를 설정하세요" value={password} onChange={e => setPassword(e.target.value)} />
+          {/* 🔥 브라우저 자동완성 끄기: autoComplete="new-password" 추가 */}
+          <input 
+            type="password" 
+            maxLength={25} 
+            className={`w-full ${theme.card} border ${theme.border} p-5 rounded-2xl outline-none focus:border-purple-600 transition text-sm font-bold`} 
+            placeholder="수정/삭제용 비밀번호를 설정하세요" 
+            value={password} 
+            onChange={e => setPassword(e.target.value)} 
+            autoComplete="new-password" 
+          />
 
           {errorMessage && <p className="text-red-500 text-sm font-bold px-2">{errorMessage}</p>}
 

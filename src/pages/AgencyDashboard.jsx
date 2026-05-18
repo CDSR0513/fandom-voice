@@ -23,14 +23,32 @@ const parseCategory = (cat) => {
 };
 
 const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
-const mapLegacyCategory = (cat) => {
-  if (NEW_CATEGORIES.includes(cat)) return cat;
-  const lowerC = String(cat).toLowerCase();
-  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
-  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
-  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
-  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
-  return '기타';
+
+// 🔥 상단과 동기화된 초정밀 다중 카테고리 매핑 해독기
+const mapLegacyCategoryAdvanced = (post) => {
+  const title = String(post.title || '');
+  const content = String(post.content || '');
+  const fullText = title + content;
+  
+  let catArray = parseCategory(post.category);
+  
+  if (fullText.includes('대곡강박')) return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  if (fullText.includes('공연에 초점')) return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  if (fullText.includes('할당제처럼')) return ['To. 아티스트', '가수 활동', '배우 활동'];
+  if (fullText.includes('음색')) return ['가수 활동'];
+  if (fullText.includes('매년 콘서트')) return ['가수 활동'];
+
+  const updatedCats = catArray.map(cat => {
+    if (NEW_CATEGORIES.includes(cat)) return cat;
+    const lowerC = String(cat).toLowerCase();
+    if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+    if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+    if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+    if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+    return '기타';
+  });
+
+  return [...new Set(updatedCats)];
 };
 
 const AgencyDashboard = () => {
@@ -57,11 +75,10 @@ const AgencyDashboard = () => {
     const { data } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
     if (data) {
       setPosts(data.map(p => {
-        let catArray = parseCategory(p.category);
-        catArray = [...new Set(catArray.map(mapLegacyCategory))]; 
+        const computedCats = mapLegacyCategoryAdvanced(p);
         return { 
           ...p, 
-          domains: catArray,
+          domains: computedCats,
           parsedUrls: parseMediaUrls(p.media_url)
         };
       }));

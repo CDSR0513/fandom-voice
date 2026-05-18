@@ -18,7 +18,6 @@ const parseCategory = (cat) => {
   }
 };
 
-// 🔥 날짜 포맷 함수 추가
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -26,14 +25,48 @@ const formatDate = (dateStr) => {
 };
 
 const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
-const mapLegacyCategory = (cat) => {
-  if (NEW_CATEGORIES.includes(cat)) return cat;
-  const lowerC = String(cat).toLowerCase();
-  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
-  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
-  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
-  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
-  return '기타';
+
+// 🔥 기획자님의 요구사항을 반영한 초정밀 다중 카테고리 매핑 해독기
+const mapLegacyCategoryAdvanced = (post) => {
+  const title = String(post.title || '');
+  const content = String(post.content || '');
+  const fullText = title + content;
+  
+  let catArray = parseCategory(post.category);
+  
+  // 1. 대곡강박 글 감지
+  if (fullText.includes('대곡강박')) {
+    return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  }
+  // 2. 공연에 초점 글 감지
+  if (fullText.includes('공연에 초점')) {
+    return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  }
+  // 3. 할당제처럼 글 감지
+  if (fullText.includes('할당제처럼')) {
+    return ['To. 아티스트', '가수 활동', '배우 활동'];
+  }
+  // 4. 음색이 돋보이는 곡 감지
+  if (fullText.includes('음색')) {
+    return ['가수 활동'];
+  }
+  // 5. 매년 콘서트 앨범 감지
+  if (fullText.includes('매년 콘서트')) {
+    return ['가수 활동'];
+  }
+
+  // 그 외 일반 구형 태그 마이그레이션 방어코드
+  const updatedCats = catArray.map(cat => {
+    if (NEW_CATEGORIES.includes(cat)) return cat;
+    const lowerC = String(cat).toLowerCase();
+    if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+    if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+    if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+    if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+    return '기타';
+  });
+
+  return [...new Set(updatedCats)];
 };
 
 const HomePage = () => {
@@ -67,9 +100,9 @@ const HomePage = () => {
     const { data, error } = await supabase.from('posts').select('*').order('created_at', { ascending: false });
     if (!error && data) {
       setPosts(data.map(p => {
-        let catArray = parseCategory(p.category);
-        catArray = [...new Set(catArray.map(mapLegacyCategory))]; 
-        return { ...p, category: catArray };
+        // 고급 다중 매핑 연산 적용
+        const computedCats = mapLegacyCategoryAdvanced(p);
+        return { ...p, category: computedCats };
       }));
     }
   };
@@ -124,8 +157,6 @@ const HomePage = () => {
         <div className="space-y-4 mb-20">
           {filteredPosts.map(post => (
             <Link to={`/post/${post.id}`} key={post.id} className={`block ${theme.card} p-6 md:p-8 rounded-[2rem] border ${theme.border} hover:border-purple-500/30 transition-all shadow-sm hover:shadow-xl group text-left`}>
-              
-              {/* 🔥 상단 카테고리와 함께 작성일시 표시 */}
               <div className="flex justify-between items-start mb-4">
                 <div className="flex flex-wrap gap-1">
                   {post.category.map(c => (

@@ -14,7 +14,6 @@ const parseMediaUrls = (urlStr) => {
   catch { return [urlStr]; } 
 };
 
-// 🔥 날짜 예쁘게 바꿔주는 포맷 함수
 const formatDate = (dateStr) => {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -22,14 +21,38 @@ const formatDate = (dateStr) => {
 };
 
 const NEW_CATEGORIES = ['To. 소속사', 'To. 아티스트', '가수 활동', '배우 활동', '기타'];
-const mapLegacyCategory = (cat) => {
-  if (NEW_CATEGORIES.includes(cat)) return cat;
-  const lowerC = String(cat).toLowerCase();
-  if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
-  if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
-  if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
-  if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
-  return '기타';
+
+// 🔥 상단들과 일관되게 구축된 초정밀 다중 카테고리 매핑 해독기
+const mapLegacyCategoryAdvanced = (post) => {
+  const title = String(post.title || '');
+  const content = String(post.content || '');
+  const fullText = title + content;
+  
+  let catArray = parseCategory(post.category);
+  
+  if (fullText.includes('대곡강박')) return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  if (fullText.includes('공연에 초점')) return ['To. 소속사', 'To. 아티스트', '가수 활동'];
+  if (fullText.includes('할당제처럼')) return ['To. 아티스트', '가수 활동', '배우 활동'];
+  if (fullText.includes('음색')) return ['가수 활동'];
+  if (fullText.includes('매년 콘서트')) return ['가수 활동'];
+
+  const updatedCats = catArray.map(cat => {
+    if (NEW_CATEGORIES.includes(cat)) return cat;
+    const lowerC = String(cat).toLowerCase();
+    if (lowerC.includes('연예인') || lowerC.includes('이지은')) return 'To. 아티스트';
+    if (lowerC.includes('가수') || lowerC.includes('공연') || lowerC.includes('goods') || lowerC.includes('굿즈')) return '가수 활동';
+    if (lowerC.includes('배우') || lowerC.includes('연기')) return '배우 활동';
+    if (lowerC.includes('소속사') || lowerC.includes('대책') || lowerC.includes('agency')) return 'To. 소속사';
+    return '기타';
+  });
+
+  return [...new Set(updatedCats)];
+};
+
+const parseCategory = (cat) => {
+  if (!cat) return ['기타'];
+  if (Array.isArray(cat)) return cat;
+  try { return JSON.parse(cat); } catch { return [cat]; }
 };
 
 const PostDetailPage = () => {
@@ -73,15 +96,8 @@ const PostDetailPage = () => {
   const fetchPost = async () => {
     const { data } = await supabase.from('posts').select('*').eq('id', id).single();
     if (data) {
-      let catArray = [];
-      try {
-        catArray = Array.isArray(data.category) ? data.category : JSON.parse(data.category);
-        if (!Array.isArray(catArray)) catArray = [data.category];
-      } catch {
-        catArray = [data.category || '기타'];
-      }
-      catArray = [...new Set(catArray.map(mapLegacyCategory))];
-      setPost({ ...data, category: catArray, parsedUrls: parseMediaUrls(data.media_url) });
+      const computedCats = mapLegacyCategoryAdvanced(data);
+      setPost({ ...data, category: computedCats, parsedUrls: parseMediaUrls(data.media_url) });
     }
   };
 
@@ -129,7 +145,6 @@ const PostDetailPage = () => {
   };
 
   const handleSaveCommentEdit = async (commentId) => {
-    // 🔥 수정된 시간 함께 저장
     const now = new Date().toISOString();
     await supabase.from('comments').update({ 
       content: editCommentContent, 
@@ -166,7 +181,6 @@ const PostDetailPage = () => {
   };
 
   const handleSaveEdit = async () => {
-    // 🔥 본문 수정된 시간 함께 저장
     const now = new Date().toISOString();
     await supabase.from('posts').update({ 
       title: editTitle, 
@@ -229,7 +243,6 @@ const PostDetailPage = () => {
             {post.category.map(c => <span key={c} className="bg-purple-600/10 text-purple-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">{c}</span>)}
           </div>
           
-          {/* 🔥 작성/수정일시 표시 (본문) */}
           <div className={`text-[11px] ${theme.sub} font-medium mb-8`}>
             {formatDate(post.created_at)} {post.updated_at && <span className="ml-1 opacity-70">(수정됨: {formatDate(post.updated_at)})</span>}
           </div>
@@ -291,7 +304,6 @@ const PostDetailPage = () => {
                   <span className={`font-bold text-sm ${comment.displayName.includes('글쓴팬') ? 'text-blue-500' : comment.displayName.includes('관리자') ? 'text-red-500' : 'text-purple-600'}`}>
                     {comment.displayName}
                   </span>
-                  {/* 🔥 작성/수정일시 표시 (댓글) */}
                   <div className={`text-[10px] ${theme.sub} mt-1 font-medium`}>
                     {formatDate(comment.created_at)} {comment.updated_at && <span className="opacity-70">(수정됨: {formatDate(comment.updated_at)})</span>}
                   </div>
